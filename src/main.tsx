@@ -2,7 +2,7 @@
 import React,{useEffect,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {createClient, type User} from '@supabase/supabase-js';
-import * as XLSX from 'xlsx';
+import { readSheet } from 'read-excel-file/browser';
 import './styles.css';
 
 const URL=import.meta.env.VITE_SUPABASE_URL;
@@ -77,7 +77,24 @@ function App(){
  async function loadAdmin(){setBusy(true);setError('');try{const x=await functionCall('admin',{action:'catalog'});setAdminData(x);setAdminSubjects(p=>p||x.planSubjects?.[0]?.id||'');setPlanId(p=>p||x.plans?.[0]?.id||'');setSubId(p=>p||x.subjects?.[0]?.id||'');setCohortId(p=>p||x.cohorts?.[0]?.id||'');setTab('admin')}catch(e){setError(why(e))}finally{setBusy(false)}}
  async function act(action:string,payload:Record<string,unknown>={}){setBusy(true);setError('');try{await functionCall('admin',{action,...payload});setMessage('تم حفظ العملية بنجاح');await loadAdmin();await reload();if(adminSubjects)await listQuestions()}catch(e){setError(why(e))}finally{setBusy(false)}}
  async function listQuestions(){if(!adminSubjects)return;try{const d=await functionCall<{questions:any[]}>('admin',{action:'list_questions',planSubjectId:adminSubjects});setQuestionRows(d.questions||[])}catch(e){setError(why(e))}}
- async function readExcel(file:File){setError('');try{if(file.size>2*1024*1024)throw Error('حجم الملف أكبر من 2 MB');const workbook=XLSX.read(await file.arrayBuffer(),{type:'array'});const rows=XLSX.utils.sheet_to_json<Record<string,any>>(workbook.Sheets[workbook.SheetNames[0]],{defval:''}).map(r=>({question:String(r.question||r.Question||'').trim(),A:String(r.A||'').trim(),B:String(r.B||'').trim(),C:String(r.C||'').trim(),D:String(r.D||'').trim(),correct:String(r.correct||'').trim().toUpperCase(),explanation:String(r.explanation||'').trim(),topic:String(r.topic||'عام').trim(),difficulty:Number(r.difficulty||1),source_type:String(r.source_type||'original').trim(),source_reference:String(r.source_reference||'').trim()}));if(!rows.length||rows.length>2000)throw Error('الملف يجب أن يحتوي بين 1 و2000 سؤال');const bad=rows.findIndex(r=>r.question.length<10||r.explanation.length<5||!r.A||!r.B||!r.C||!r.D||!['A','B','C','D'].includes(r.correct)||![1,2,3].includes(r.difficulty));if(bad>=0)throw Error('بيانات ناقصة في الصف '+(bad+2));setImports(rows);setMessage('معاينة الاستيراد: '+rows.length+' سؤال. لن تُنشر قبل المراجعة.')}catch(e){setError(why(e))}}
+ async function readExcel(file:File){
+  setError('');try{
+   if(file.size>2*1024*1024)throw Error('حجم الملف أكبر من 2 MB');
+   const matrix=await readSheet(file);
+   if(!matrix.length||matrix.length>2001)throw Error('الملف يجب أن يحتوي عنوان أعمدة ثم 1 إلى 2000 سؤال');
+   const header=matrix[0].map(cell=>String(cell??'').trim());
+   const required=['question','A','B','C','D','correct','explanation'];
+   if(required.some(col=>!header.includes(col)))throw Error('عناوين الأعمدة المطلوبة: '+required.join(', '));
+   const rows=matrix.slice(1).filter(line=>line.some(v=>v!==null&&v!==undefined&&String(v).trim()!=='')).map(line=>Object.fromEntries(header.map((key,i)=>[key,String(line[i]??'').trim()]))).map(r=>({
+    question:r.question,A:r.A,B:r.B,C:r.C,D:r.D,correct:(r.correct||'').toUpperCase(),explanation:r.explanation,
+    topic:r.topic||'عام',difficulty:Number(r.difficulty||1),source_type:r.source_type||'original',source_reference:r.source_reference||''
+   }));
+   if(rows.length<1||rows.length>2000)throw Error('الملف يجب أن يحتوي بين 1 و2000 سؤال');
+   const bad=rows.findIndex(r=>r.question.length<10||r.explanation.length<5||!r.A||!r.B||!r.C||!r.D||!['A','B','C','D'].includes(r.correct)||![1,2,3].includes(r.difficulty));
+   if(bad>=0)throw Error('بيانات ناقصة في الصف '+(bad+2));
+   setImports(rows);setMessage('معاينة الاستيراد: '+rows.length+' سؤال. لن تُنشر قبل المراجعة.');
+  }catch(e){setError(why(e))}
+ }
  async function importExcel(){setBusy(true);setError('');try{let imported=0;for(let i=0;i<imports.length;i+=50){const r=await functionCall<{imported:number}>('admin',{action:'import_questions',planSubjectId:adminSubjects,questions:imports.slice(i,i+50)});imported+=r.imported}setImports([]);setMessage('تم إدخال '+imported+' سؤال كمسودة');await listQuestions()}catch(e){setError(why(e))}finally{setBusy(false)}}
  if(!db)return <main className="wrap"><h1>توجيهي 360</h1><div className="alert error">لم يتم إعداد VITE_SUPABASE_URL و VITE_SUPABASE_ANON_KEY</div></main>;
  return <div dir="rtl"><div className="ribbon">توجيهي 360 • منصة تدريب مستقلة • الأسئلة الوزارية تتطلب توثيق المصدر واعتماد المعلم</div>
