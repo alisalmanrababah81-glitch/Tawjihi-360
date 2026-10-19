@@ -14,13 +14,6 @@ type Session={attemptId:string;questions:Q[];mode:string};
 type Review={id:string;question:string;topic:string;options:Record<string,string>;selected:string|null;correctAnswer:string;isCorrect:boolean;explanation:string};
 type Result={score:number;correctCount:number;total:number;review:Review[]};
 const chars:Record<string,string>={A:'أ',B:'ب',C:'ج',D:'د'};
-const DEMO: Array<Q & {correct:string;explanation:string}> = [
- {id:'demo1',question:'ما قيمة س في المعادلة ٢س + ٣ = ١١؟',topic:'المعادلات',difficulty:1,options:{A:'٣',B:'٤',C:'٥',D:'٧'},correct:'B',explanation:'نطرح ٣ من الطرفين لنحصل على ٢س = ٨، ثم نقسم على ٢؛ إذن س = ٤.'},
- {id:'demo2',question:'مثلث قائم الزاوية طول ضلعيه القائمين ٣ سم و٤ سم. ما طول الوتر؟',topic:'الهندسة',difficulty:1,options:{A:'٥ سم',B:'٦ سم',C:'٧ سم',D:'١٢ سم'},correct:'A',explanation:'بنظرية فيثاغورس: مربع الوتر = ٣² + ٤² = ٢٥، ولذلك طول الوتر ٥ سم.'},
- {id:'demo3',question:'إذا كانت د(س) = س² − ١، فما قيمة د(٣)؟',topic:'الدوال',difficulty:1,options:{A:'٦',B:'٧',C:'٨',D:'٩'},correct:'C',explanation:'نعوض س = ٣، فنحصل على ٣² − ١ = ٩ − ١ = ٨.'},
- {id:'demo4',question:'مستطيل طوله ٦ سم وعرضه ٤ سم. ما محيطه؟',topic:'الأشكال الهندسية',difficulty:1,options:{A:'١٠ سم',B:'١٢ سم',C:'٢٠ سم',D:'٢٤ سم'},correct:'C',explanation:'محيط المستطيل = ٢ × (الطول + العرض) = ٢ × (٦ + ٤) = ٢٠ سم.'},
- {id:'demo5',question:'عند رمي قطعة نقود عادلة مرة واحدة، ما احتمال ظهور الصورة؟',topic:'الاحتمالات',difficulty:1,options:{A:'١',B:'١/٢',C:'١/٤',D:'صفر'},correct:'B',explanation:'هناك نتيجتان متساويتان في الاحتمال؛ لذلك احتمال ظهور الصورة هو ١ من ٢.'}
-];
 const why=(e:unknown)=>e instanceof Error?e.message:String(e);
 async function functionCall<T=any>(name:'quiz'|'admin'|'privacy',body:Record<string,unknown>):Promise<T>{
  if(!db)throw Error('لم يتم ضبط الاتصال بقاعدة البيانات');
@@ -31,9 +24,9 @@ async function functionCall<T=any>(name:'quiz'|'admin'|'privacy',body:Record<str
 }
 function App(){
  const [user,setUser]=useState<User|null>(null),[role,setRole]=useState(''),[tab,setTab]=useState('home');
- const [catalog,setCatalog]=useState<Subject[]>([]),[inventory,setInventory]=useState<Record<string,number>>({}),[pilotInventory,setPilotInventory]=useState<Record<string,number>>({}),[cohorts,setCohorts]=useState<{id:string;label:string}[]>([]),[mappings,setMappings]=useState<{cohort_id:string;grade_level:number;curriculum_plan_id:string}[]>([]),[fields,setFields]=useState<{id:string;name:string}[]>([]);
+ const [catalog,setCatalog]=useState<Subject[]>([]),[inventory,setInventory]=useState<Record<string,number>>({}),[cohorts,setCohorts]=useState<{id:string;label:string}[]>([]),[mappings,setMappings]=useState<{cohort_id:string;grade_level:number;curriculum_plan_id:string}[]>([]),[fields,setFields]=useState<{id:string;name:string}[]>([]);
  const [cohort,setCohort]=useState(''),[grade,setGrade]=useState(11),[field,setField]=useState(''),[subject,setSubject]=useState('');
- const [session,setSession]=useState<Session|null>(null),[answers,setAnswers]=useState<Record<string,string>>({}),[current,setCurrent]=useState(0),[result,setResult]=useState<Result|null>(null),[history,setHistory]=useState<any[]>([]),[lastDemo,setLastDemo]=useState(false),[lastPilot,setLastPilot]=useState(false),[pilotSize,setPilotSize]=useState<5|10>(5);
+ const [session,setSession]=useState<Session|null>(null),[answers,setAnswers]=useState<Record<string,string>>({}),[current,setCurrent]=useState(0),[result,setResult]=useState<Result|null>(null),[history,setHistory]=useState<any[]>([]),[resultSubject,setResultSubject]=useState('');
  const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[signup,setSignup]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
  const [adminData,setAdminData]=useState<any>(null),[adminSubjects,setAdminSubjects]=useState(''),[questionRows,setQuestionRows]=useState<any[]>([]),[imports,setImports]=useState<any[]>([]);
  const [planName,setPlanName]=useState(''),[academicYear,setAcademicYear]=useState('2026/2027'),[ref,setRef]=useState('https://www.nccd.gov.jo/ar/pages/TextBooksGrade/118'),[label,setLabel]=useState(''),[planId,setPlanId]=useState(''),[subId,setSubId]=useState(''),[fieldId,setFieldId]=useState(''),[examSession,setExamSession]=useState('2026/2027'),[cohortId,setCohortId]=useState('');
@@ -50,10 +43,10 @@ function App(){
    db.from('cohort_curriculum_assignments').select('cohort_id,grade_level,curriculum_plan_id').eq('verified',true),
    db.from('plan_subjects').select('id,grade_level,field_id,curriculum_plan_id,subjects!inner(name_ar,code)').eq('verification_status','verified').eq('is_ministerial_exam',true),
    db.from('fields').select('id,name'),
-   db.from('question_inventory').select('plan_subject_id,published_count,pilot_count')
+   db.from('question_inventory').select('plan_subject_id,published_count')
   ]);
   const failed=[c,m,s,f,i].find(q=>q.error);if(failed?.error)throw failed.error;
-  setCohorts((c.data||[]) as any);setMappings((m.data||[]) as any);setCatalog((s.data||[]) as any);setFields(f.data||[]);setInventory(Object.fromEntries((i.data||[]).map((v:any)=>[v.plan_subject_id,Number(v.published_count)||0])));setPilotInventory(Object.fromEntries((i.data||[]).map((v:any)=>[v.plan_subject_id,Number(v.pilot_count)||0])));
+  setCohorts((c.data||[]) as any);setMappings((m.data||[]) as any);setCatalog((s.data||[]) as any);setFields(f.data||[]);setInventory(Object.fromEntries((i.data||[]).map((v:any)=>[v.plan_subject_id,Number(v.published_count)||0])));
   setCohort(p=>p||localStorage.getItem('t360_cohort')||(c.data||[])[0]?.id||'');
   setField(p=>p||(f.data||[])[0]?.id||'');
  }
@@ -65,22 +58,23 @@ function App(){
  }
  useEffect(()=>{void refresh();void reload().catch(e=>setError(why(e)));if(!db)return;const {data:{subscription}}=db.auth.onAuthStateChange(()=>{setTimeout(()=>void refresh(),0)});return()=>subscription.unsubscribe()},[]);
  useEffect(()=>{if(cohort)localStorage.setItem('t360_cohort',cohort)},[cohort]);
- useEffect(()=>{if(session)localStorage.setItem('t360_active',JSON.stringify({attemptId:session.attemptId,answers,current}))},[session,answers,current]);
- useEffect(()=>{if(session||tab==='result'||tab==='quiz')return;const s=localStorage.getItem('t360_active');if(!s)return;try{const a=JSON.parse(s);if(a.attemptId==='demo'){setSession({attemptId:'demo',questions:DEMO.map(({correct,explanation,...q})=>q),mode:'quick'});setAnswers(a.answers||{});setCurrent(Math.max(0,Math.min(a.current||0,DEMO.length-1)));setLastDemo(true);setTab('quiz');return}if(!user)return;void functionCall<Session>('quiz',{action:'resume',attemptId:a.attemptId}).then(x=>{setSession(x);setLastDemo(false);setLastPilot(x.mode==='pilot');setAnswers(a.answers||{});setCurrent(Math.min(a.current||0,x.questions.length-1));setTab('quiz')}).catch(()=>localStorage.removeItem('t360_active'))}catch{localStorage.removeItem('t360_active')}},[user]);
+ useEffect(()=>{if(session)localStorage.setItem('t360_active',JSON.stringify({attemptId:session.attemptId,subjectId:resultSubject,answers,current}))},[session,answers,current]);
+ useEffect(()=>{if(session||tab==='result'||tab==='quiz')return;const s=localStorage.getItem('t360_active');if(!s)return;try{const a=JSON.parse(s);if(!user)return;void functionCall<Session>('quiz',{action:'resume',attemptId:a.attemptId}).then(x=>{setSession(x);setResultSubject(a.subjectId||'');setAnswers(a.answers||{});setCurrent(Math.min(a.current||0,x.questions.length-1));setTab('quiz')}).catch(()=>localStorage.removeItem('t360_active'))}catch{localStorage.removeItem('t360_active')}},[user]);
  async function guest(){if(!db)throw Error('لا يوجد اتصال');const {data:{session}}=await db.auth.getSession();if(session)return;const r=await db.auth.signInAnonymously();if(r.error)throw Error('فعّل الدخول المجهول Anonymous Sign-ins من Supabase Auth: '+r.error.message);await refresh();}
- function beginDemo(mode:'quick'|'remedial'='quick'){let weak:string[]=[];try{const p=JSON.parse(localStorage.getItem('t360_demo')||'{}');weak=Array.isArray(p.wrong)?p.wrong:[]}catch{}const ordered=mode==='remedial'?[...DEMO].sort((a,b)=>Number(weak.includes(b.id))-Number(weak.includes(a.id))):DEMO;setSession({attemptId:'demo',questions:ordered.map(({correct,explanation,...q})=>q),mode});setAnswers({});setCurrent(0);setLastDemo(true);setLastPilot(false);setResult(null);setError('');setTab('quiz');window.scrollTo(0,0)}
- async function begin(mode:'quick'|'remedial'='quick',sid?:string){const s=sid||chosen?.id;if(!s)return;setBusy(true);setError('');try{await guest();const r=await functionCall<Session>('quiz',{action:'start',planSubjectId:s,mode});setLastDemo(false);setLastPilot(false);setSession(r);setAnswers({});setCurrent(0);setResult(null);setTab('quiz');scrollTo(0,0)}catch(e){setError(why(e))}finally{setBusy(false)}}
- async function beginPilot(sid?:string, count:5|10=pilotSize){
-  if(!consentCheck())return;
-  const id=sid||chosen?.id;if(!id)return;
-  setBusy(true);setError('');
-  try{
-   await guest();
-   const r=await functionCall<Session>('quiz',{action:'pilot',planSubjectId:id,count});
-   setSubject(id);setLastDemo(false);setLastPilot(true);setSession(r);setAnswers({});setCurrent(0);setResult(null);setTab('quiz');window.scrollTo(0,0);
-  }catch(e){setError(why(e))}finally{setBusy(false)}
+
+ async function begin(mode:'quick'|'remedial'='quick',sid?:string){
+ const s=sid||chosen?.id;if(!s||!consentCheck())return;
+ setBusy(true);setError('');
+ try{await guest();const r=await functionCall<Session>('quiz',{action:'start',planSubjectId:s,mode});
+ setSubject(s);setResultSubject(s);setSession(r);setAnswers({});setCurrent(0);setResult(null);setTab('quiz');window.scrollTo(0,0)}
+ catch(e){setError(why(e))}finally{setBusy(false)}
  }
- async function submit(){if(!session)return;setBusy(true);setError('');try{if(session.attemptId==='demo'){const review:Review[]=session.questions.map(q=>{const source=DEMO.find(x=>x.id===q.id)!;const selected=answers[q.id]||null;return {id:q.id,question:q.question,topic:q.topic,options:q.options,selected,correctAnswer:source.correct,isCorrect:selected===source.correct,explanation:source.explanation}});const correctCount=review.filter(r=>r.isCorrect).length;const r:Result={score:Math.round(100*correctCount/review.length),correctCount,total:review.length,review};localStorage.setItem('t360_demo',JSON.stringify({wrong:review.filter(r=>!r.isCorrect).map(r=>r.id)}));setResult(r);setSession(null);localStorage.removeItem('t360_active');setTab('result');window.scrollTo(0,0);return;}const r=await functionCall<Result>('quiz',{action:'submit',attemptId:session.attemptId,answers});setResult(r);setSession(null);localStorage.removeItem('t360_active');setTab('result');scrollTo(0,0)}catch(e){setError(why(e))}finally{setBusy(false)}}
+ async function submit(){if(!session)return;setBusy(true);setError('');try{
+ const r=await functionCall<Result>('quiz',{action:'submit',attemptId:session.attemptId,answers});
+ setResult(r);setSession(null);localStorage.removeItem('t360_active');setTab('result');window.scrollTo(0,0)
+ }catch(e){setError(why(e))}finally{setBusy(false)}
+ }
+
  async function login(e:React.FormEvent){e.preventDefault();if(!db)return;if(signup&&!consentCheck())return;setBusy(true);setError('');try{let r;
   if(signup&&user?.is_anonymous){const x=await db.auth.updateUser({email});if(x.error)throw x.error;setMessage('تم طلب ربط البريد بحساب الضيف. تحقّق من الرسالة أولاً، ثم عيّن كلمة المرور بعد تأكيد البريد.');return;}
   r=signup?await db.auth.signUp({email,password}):await db.auth.signInWithPassword({email,password});
@@ -93,7 +87,7 @@ function App(){
   setBusy(true);setError('');
   try{const r=await functionCall<{deleted:boolean}>('privacy',{action:'delete_my_account',confirm:'DELETE_MY_ACCOUNT'});
    if(!r.deleted)throw Error('تعذر حذف الحساب');
-   await db.auth.signOut({scope:'local'});localStorage.removeItem('t360_active');localStorage.removeItem('t360_demo');localStorage.removeItem('t360_cloud_agreement');
+   await db.auth.signOut({scope:'local'});localStorage.removeItem('t360_active');localStorage.removeItem('t360_cloud_agreement');
    setConsent(false);setSession(null);setResult(null);setAnswers({});setHistory([]);setUser(null);setRole('');setMessage('تم حذف الحساب ونتائجك من الخادم');setTab('home');
   }catch(e){setError(why(e))}finally{setBusy(false)}
  }
@@ -102,52 +96,76 @@ function App(){
  async function loadAdmin(){setBusy(true);setError('');try{const x=await functionCall('admin',{action:'catalog'});setAdminData(x);setAdminSubjects(p=>p||x.planSubjects?.[0]?.id||'');setPlanId(p=>p||x.plans?.[0]?.id||'');setSubId(p=>p||x.subjects?.[0]?.id||'');setCohortId(p=>p||x.cohorts?.[0]?.id||'');setTab('admin')}catch(e){setError(why(e))}finally{setBusy(false)}}
  async function act(action:string,payload:Record<string,unknown>={}){setBusy(true);setError('');try{await functionCall('admin',{action,...payload});setMessage('تم حفظ العملية بنجاح');await loadAdmin();await reload();if(adminSubjects)await listQuestions()}catch(e){setError(why(e))}finally{setBusy(false)}}
  async function listQuestions(){if(!adminSubjects)return;try{const d=await functionCall<{questions:any[]}>('admin',{action:'list_questions',planSubjectId:adminSubjects});setQuestionRows(d.questions||[])}catch(e){setError(why(e))}}
+
  async function readExcel(file:File){
-  setError('');try{
-   if(file.size>2*1024*1024)throw Error('حجم الملف أكبر من 2 MB');
+  setError('');setImports([]);
+  try{
+   if(file.size>5*1024*1024)throw Error('حجم الملف أكبر من 5 MB');
    const matrix=await readSheet(file);
-   if(!matrix.length||matrix.length>2001)throw Error('الملف يجب أن يحتوي عنوان أعمدة ثم 1 إلى 2000 سؤال');
+   if(!matrix.length||matrix.length>2001)throw Error('ملف Excel يجب أن يحتوي على عناوين الأعمدة و1 إلى 2000 سؤال');
    const header=matrix[0].map(cell=>String(cell??'').trim());
-   const required=['question','A','B','C','D','correct','explanation'];
-   if(required.some(col=>!header.includes(col)))throw Error('عناوين الأعمدة المطلوبة: '+required.join(', '));
-   const rows=matrix.slice(1).filter(line=>line.some(v=>v!==null&&v!==undefined&&String(v).trim()!=='')).map(line=>Object.fromEntries(header.map((key,i)=>[key,String(line[i]??'').trim()]))).map(r=>({
-    question:r.question,A:r.A,B:r.B,C:r.C,D:r.D,correct:(r.correct||'').toUpperCase(),explanation:r.explanation,
-    topic:r.topic||'عام',difficulty:Number(r.difficulty||1),source_type:r.source_type||'original',source_reference:r.source_reference||''
+   const required=['question','A','B','C','D','correct','explanation','exam_year','exam_session','question_number','source_reference','difficulty'];
+   if(required.some(col=>!header.includes(col)))throw Error('أعمدة ناقصة: '+required.filter(col=>!header.includes(col)).join('، '));
+   const records=matrix.slice(1).filter(line=>line.some(v=>v!==null&&String(v??'').trim()!=='')).map(line=>Object.fromEntries(header.map((key,i)=>[key,String(line[i]??'').trim()]))).map((r:any)=>({
+    question:r.question,A:r.A,B:r.B,C:r.C,D:r.D,correct:String(r.correct).toUpperCase(),explanation:r.explanation,
+    exam_year:String(r.exam_year),exam_session:r.exam_session,question_number:r.question_number,
+    source_reference:r.source_reference,rights_note:r.rights_note||'',difficulty:Number(r.difficulty),topic:r.topic||'عام'
    }));
-   if(rows.length<1||rows.length>2000)throw Error('الملف يجب أن يحتوي بين 1 و2000 سؤال');
-   const bad=rows.findIndex(r=>r.question.length<10||r.explanation.length<5||!r.A||!r.B||!r.C||!r.D||!['A','B','C','D'].includes(r.correct)||![1,2,3].includes(r.difficulty));
-   if(bad>=0)throw Error('بيانات ناقصة في الصف '+(bad+2));
-   setImports(rows);setMessage('معاينة الاستيراد: '+rows.length+' سؤال. لن تُنشر قبل المراجعة.');
+   if(!records.length||records.length>2000)throw Error('يجب أن يكون الملف من 1 إلى 2000 سؤال');
+   const bad=records.findIndex((r:any)=>r.question.length<10||r.explanation.length<5
+    ||!r.A||!r.B||!r.C||!r.D||!['A','B','C','D'].includes(r.correct)||![1,2,3].includes(r.difficulty)
+    ||!/^\d{4}$/.test(r.exam_year)||Number(r.exam_year)<1950||!r.exam_session||!r.question_number||!String(r.source_reference).startsWith('https://'));
+   if(bad>=0)throw Error('تحقق من بيانات السؤال في صف Excel رقم '+(bad+2)+'، لا يُسمح بالأسئلة غير الموثقة');
+   setImports(records);setMessage('جاهز لاستيراد '+records.length+' سؤال وزاري كمسودة، ولن يظهر للطلاب إلا بعد المراجعة والنشر');
   }catch(e){setError(why(e))}
  }
- async function importExcel(){setBusy(true);setError('');try{let imported=0;for(let i=0;i<imports.length;i+=50){const r=await functionCall<{imported:number}>('admin',{action:'import_questions',planSubjectId:adminSubjects,questions:imports.slice(i,i+50)});imported+=r.imported}setImports([]);setMessage('تم إدخال '+imported+' سؤال كمسودة');await listQuestions()}catch(e){setError(why(e))}finally{setBusy(false)}}
+
+ async function importExcel(){setBusy(true);setError('');try{let imported=0;for(let i=0;i<imports.length;i+=50){const r=await functionCall<{imported:number}>('admin',{action:'import_questions',planSubjectId:adminSubjects,questions:imports.slice(i,i+50)});imported+=r.imported}setImports([]);setMessage('تم استيراد '+imported+' سؤال وزاري كمسودات بانتظار مراجعة المصادر والإجابات');await listQuestions()}catch(e){setError(why(e))}finally{setBusy(false)}}
  if(!db)return <main className="wrap"><h1>توجيهي 360</h1><div className="alert error">لم يتم إعداد VITE_SUPABASE_URL و VITE_SUPABASE_ANON_KEY</div></main>;
  return <div dir="rtl"><div className="ribbon">توجيهي 360 • منصة تدريب مستقلة • الأسئلة الوزارية تتطلب توثيق المصدر واعتماد المعلم</div>
  <header className="header"><div className="headerin"><div className="brand">توجيهي <b>360</b><small>مش بس تعرف علامتك، تعرف كيف ترفعها.</small></div><nav className="nav"><button className={tab==='home'?'active':''} onClick={()=>setTab('home')}>الرئيسية</button><button onClick={()=>void loadHistory()}>نتائجي</button>{role&&<button onClick={()=>void loadAdmin()}>لوحة الإدارة</button>}{user?<button onClick={()=>void logout()}>{user.email?'خروج':'ضيف • خروج'}</button>:<button onClick={()=>setTab('login')}>تسجيل الدخول</button>}<button onClick={()=>setTab('privacy')}>الخصوصية</button></nav></div></header>
  <main className="wrap">{error&&<div role="alert" className="alert error">{error}</div>}{message&&<div className="alert success">{message}<button className="btn" style={{float:'left'}} onClick={()=>setMessage('')}>×</button></div>}
- {tab==='home'&&<><div className="hero"><span className="pill">نسخة سحابية تجريبية</span><h1>اختبر مستواك اليوم،<br/> واعرف كيف ترفع علامتك</h1><p>تدرّب على أسئلة رياضيات أصلية، واحصل على تصحيح واضح وتدريب مُخصص لأخطائك. الأسئلة التدريبية ليست أسئلة وزارية رسمية.</p><button className="btn" onClick={()=>beginDemo()}>جرّب اختباراً فورياً ←</button></div><section className="panel"><div className="row-between"><div><span className="section-label">ابدأ دون تسجيل</span><h2>اختبار تجريبي من ٥ أسئلة</h2><p className="muted">أسئلة رياضيات من تأليف المنصة لأغراض التجربة، وليست أسئلة وزارية أو تمثيلاً للخطة الرسمية. تُحفظ نتائج التجربة على جهازك فقط.</p></div><button className="btn primary" onClick={()=>beginDemo()}>ابدأ الاختبار الآن ←</button></div></section><section className="panel" id="choose"><h2>اختر جيلك وسنتك ومبحثك</h2>
- <div className="alert" style={{margin:'10px 0'}}>لتجربة الأسئلة السحابية، ينشئ النظام حساب ضيف مجهولاً ويحفظ إجاباتك ونتائجك؛ أما الاختبار التوضيحي المحلي فلا يرسل إجاباتك للخادم. اقرأ <button className="btn" style={{padding:'4px 8px'}} onClick={()=>setTab('privacy')}>سياسة الخصوصية</button> قبل البدء.</div>
- <label className="row" style={{justifyContent:'flex-start',marginBottom:14}}><input type="checkbox" style={{width:18,height:18}} checked={consent} onChange={e=>{setConsent(e.target.checked);setConsentError('');if(e.target.checked)localStorage.setItem('t360_cloud_agreement','yes');else localStorage.removeItem('t360_cloud_agreement')}}/> أوافق على حفظ بيانات محاولات الاختبار السحابي وفق سياسة الخصوصية.</label>
- {consentError&&<div role="alert" className="alert error">{consentError}</div>}<div className="form"><label>الجيل<select value={cohort} onChange={e=>setCohort(e.target.value)}>{cohorts.map(x=><option key={x.id} value={x.id}>{x.label}</option>)}</select></label><label>السنة<select value={grade} onChange={e=>setGrade(Number(e.target.value))}><option value={11}>السنة الأولى – الحادي عشر</option><option value={12}>السنة الثانية – الثاني عشر</option></select></label>{grade===12&&<label>الحقل<select value={field} onChange={e=>setField(e.target.value)}>{fields.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}</div><div className="row" style={{marginTop:16}}><label style={{minWidth:170,maxWidth:230}}>عدد الأسئلة التدريبية<select value={pilotSize} onChange={e=>setPilotSize(Number(e.target.value)===10?10:5)}><option value={5}>5 أسئلة</option><option value={10}>10 أسئلة</option></select></label></div>
-<div className="grid" style={{marginTop:18}}>{visible.map(s=><div className="card" key={s.id}>
-<span className="section-label">مبحث وزاري • جيلك</span><h3>{s.subjects.name_ar}</h3>
-<p style={{marginBottom:12}}>أسئلة تدريبية أصلية: {pilotInventory[s.id]||0} | محتوى وزاري منشور: {inventory[s.id]||0}</p>
-<div className="row">
-<button className="btn primary" disabled={busy||(pilotInventory[s.id]||0)<pilotSize} onClick={()=>void beginPilot(s.id)}>{(pilotInventory[s.id]||0)<pilotSize?'التدريب قيد التجهيز':`ابدأ تدريباً تجريبياً (${pilotSize})`}</button>
-<button className="btn" disabled={busy||(inventory[s.id]||0)<5} onClick={()=>{setSubject(s.id);void begin('quick',s.id)}}>اختبار بأسئلة معتمدة</button>
-</div><p className="muted" style={{marginTop:10}}>التدريبات التجريبية من تأليف المنصة وليست أسئلة وزارية سابقة.</p>
-</div>)}</div>{!visible.length&&<div className="alert">لم تُعتمد مباحث لهذه السنة والجيل بعد. لا نعرض محتوى غير موثق؛ يُتاح الاختبار بعد اعتماد الخطة وإضافة خمسة أسئلة مراجعة.</div>}</section><div className="grid"><div className="panel"><h2>اختبر في أقل من دقيقة</h2><p className="muted">لا تتطلب البداية إنشاء حساب. يحفظ الحساب المجهول نتائجك في المتصفح نفسه.</p></div><div className="panel"><h2>افهم أخطاءك</h2><p className="muted">يظهر التفسير الصحيح بعد تسليم الاختبار، وليس أثناء الامتحان.</p></div><div className="panel"><h2>درّب نقاط الضعف</h2><p className="muted">تُختار أسئلة المراجعة وفق أخطائك السابقة بعد توفر بيانات كافية.</p></div></div></>}
- {tab==='quiz'&&session&&<section className="panel"><div className="row-between"><span className="section-label">{session.attemptId==='demo'?'أسئلة توضيحية غير وزارية':session.mode==='pilot'?'تدريب رياضيات أصلي — غير وزاري':'اختبار '+(session.mode==='remedial'?'علاجي':'سريع')}</span><strong>{current+1} / {session.questions.length}</strong></div><div className="progress"><div style={{width:(100*(current+1)/session.questions.length)+'%'}}/></div><h2 className="question">{session.questions[current].question}</h2>{Object.entries(session.questions[current].options).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=><button key={k} className={'choice '+(answers[session.questions[current].id]===k?'selected':'')} onClick={()=>setAnswers(p=>({...p,[session.questions[current].id]:k}))}><strong>{chars[k]||k}</strong>{v}</button>)}<div className="row-between" style={{marginTop:20}}><button className="btn" disabled={current===0} onClick={()=>setCurrent(v=>v-1)}>السابق</button>{current+1<session.questions.length?<button className="btn primary" onClick={()=>setCurrent(v=>v+1)}>التالي ←</button>:<button disabled={busy} className="btn green" onClick={()=>void submit()}>تسليم وتصحيح الاختبار</button>}</div></section>}
- {tab==='result'&&result&&<><section className="panel"><span className="section-label">نتيجتك — ماذا تعلمت؟</span><h2>العلامة ليست النهاية؛ بل بداية خطة التحسين</h2><div className="grid"><div className="metric"><b>{result.score}%</b><small>علامتك</small></div><div className="metric"><b>{result.correctCount}</b><small>إجابات صحيحة</small></div><div className="metric"><b>{result.total-result.correctCount}</b><small>تحتاج مراجعة</small></div></div><div className="row" style={{marginTop:18}}><button disabled={busy} className="btn primary" onClick={()=>lastDemo?beginDemo('remedial'):lastPilot?void beginPilot(chosen?.id,pilotSize):void begin('remedial')}>اختبرني في أخطائي</button><button className="btn" onClick={()=>setTab('home')}>الصفحة الرئيسية</button></div></section><section className="panel"><h2>مراجعة الإجابات</h2>{result.review.map((r,i)=><div className={'review '+(!r.isCorrect?'wrong':'')} key={r.id}><strong>{i+1}. {r.question}</strong><p>إجابتك: {r.selected?r.options[r.selected]:'بدون إجابة'}</p><p>الصحيحة: <b>{r.options[r.correctAnswer]}</b></p><p className="muted">{r.explanation}</p></div>)}</section></>}
- {tab==='history'&&<section className="panel"><h2>سجل محاولاتك</h2>{!user?<div className="alert">ابدأ اختباراً أولاً ليظهر سجل نتائجك.</div>:history.length?<div className="grid">{history.map((r,i)=><div key={i} className="metric"><b>{r.score}%</b><small>{r.mode==='pilot'?'تجريبي أصلي':r.mode==='remedial'?'علاجي':'سريع'} • {new Date(r.started_at).toLocaleDateString('ar-JO')}</small></div>)}</div>:<p>لم تكمل أي اختبار بعد.</p>}</section>}
+ 
+ {tab==='home'&&<>
+ <div className="hero">
+  <span className="pill">التدريب على أسئلة امتحانات وزارية موثقة</span>
+  <h1>توجيهي 360<br/> مش بس تعرف علامتك، تعرف كيف ترفعها.</h1>
+  <p>تدرّب على الأسئلة الوزارية بعد توثيق المصدر ومراجعتها ونشرها. لا تتضمن المنصة أسئلة تجريبية أو مولّدة أو منسوبة خطأً إلى الوزارة.</p>
+  <button className="btn" onClick={()=>document.getElementById('choose')?.scrollIntoView({behavior:'smooth'})}>اختر مبحثك ←</button>
+ </div>
+ <section className="panel" id="choose"><h2>اختر الجيل والسنة والمبحث الوزاري</h2>
+ <div className="alert">تبدأ الاختبارات عندما يُنشر للمبحث 5 أسئلة وزارية موثقة على الأقل. حتى ذلك الحين ستظهر المواد بعبارة «بانتظار إضافة الأسئلة الوزارية».</div>
+ <div className="form"><label>الجيل<select value={cohort} onChange={e=>setCohort(e.target.value)}>{cohorts.map(x=><option key={x.id} value={x.id}>{x.label}</option>)}</select></label>
+ <label>السنة<select value={grade} onChange={e=>setGrade(Number(e.target.value))}><option value={11}>الأولى — الحادي عشر</option><option value={12}>الثانية — الثاني عشر</option></select></label>
+ {grade===12&&<label>الحقل<select value={field} onChange={e=>setField(e.target.value)}>{fields.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}</div>
+ <div className="row" style={{justifyContent:'flex-start',margin:'17px 0'}}>
+ <label className="row"><input type="checkbox" style={{width:18,height:18}} checked={consent}
+ onChange={e=>{setConsent(e.target.checked);setConsentError('');if(e.target.checked)localStorage.setItem('t360_cloud_agreement','yes');else localStorage.removeItem('t360_cloud_agreement')}}/>
+ أوافق على حفظ محاولاتي ونتائجي للتصحيح وتخصيص التدريب. <button className="btn" style={{padding:'5px 8px'}} onClick={()=>setTab('privacy')}>الخصوصية</button></label>
+ </div>{consentError&&<div className="alert error" role="alert">{consentError}</div>}
+ <div className="grid">{visible.map(s=><div key={s.id} className="card">
+ <span className="section-label">مبحث وزاري</span><h3>{s.subjects.name_ar}</h3>
+ <p>{(inventory[s.id]||0)>0?('أسئلة وزارية منشورة: '+inventory[s.id]):'بانتظار إضافة الأسئلة الوزارية'}</p>
+ <button className="btn primary" style={{marginTop:14}} disabled={busy||(inventory[s.id]||0)<5}
+ onClick={()=>void begin('quick',s.id)}>{(inventory[s.id]||0)<5?'غير متاح بعد':'ابدأ اختباراً وزارياً ←'}</button>
+ </div>)}</div>
+ {!visible.length&&<div className="alert">لا توجد مباحث وزارية مرتبطة بهذا الجيل والسنة حتى الآن.</div>}
+ </section>
+ <div className="grid"><div className="panel"><h2>تدريب على الأخطاء</h2><p className="muted">بعد حل الأسئلة الوزارية، يقدّم لك النظام تمارين إضافية من البنك الوزاري المنشور مع إعطاء الأولوية لأخطائك.</p></div>
+ <div className="panel"><h2>تصحيح وتفسير</h2><p className="muted">تُصحّح الإجابات على الخادم، ثم تظهر النتيجة والتفسير والمصدر الوزاري للأسئلة المتاحة.</p></div></div>
+ </>}
+
+{tab==='quiz'&&session&&<section className="panel"><div className="row-between"><span className="section-label">{'أسئلة امتحانات وزارية — '+(session.mode==='remedial'?'مراجعة الأخطاء':'اختبار سريع')}</span><strong>{current+1} / {session.questions.length}</strong></div><div className="progress"><div style={{width:(100*(current+1)/session.questions.length)+'%'}}/></div><h2 className="question">{session.questions[current].question}</h2>{Object.entries(session.questions[current].options).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=><button key={k} className={'choice '+(answers[session.questions[current].id]===k?'selected':'')} onClick={()=>setAnswers(p=>({...p,[session.questions[current].id]:k}))}><strong>{chars[k]||k}</strong>{v}</button>)}<div className="row-between" style={{marginTop:20}}><button className="btn" disabled={current===0} onClick={()=>setCurrent(v=>v-1)}>السابق</button>{current+1<session.questions.length?<button className="btn primary" onClick={()=>setCurrent(v=>v+1)}>التالي ←</button>:<button disabled={busy} className="btn green" onClick={()=>void submit()}>تسليم وتصحيح الاختبار</button>}</div></section>}
+ {tab==='result'&&result&&<><section className="panel"><span className="section-label">نتيجتك — ماذا تعلمت؟</span><h2>العلامة ليست النهاية؛ بل بداية خطة التحسين</h2><div className="grid"><div className="metric"><b>{result.score}%</b><small>علامتك</small></div><div className="metric"><b>{result.correctCount}</b><small>إجابات صحيحة</small></div><div className="metric"><b>{result.total-result.correctCount}</b><small>تحتاج مراجعة</small></div></div><div className="row" style={{marginTop:18}}><button disabled={busy} className="btn primary" onClick={()=>void begin('remedial',resultSubject)}>اختبرني في أخطائي</button><button className="btn" onClick={()=>setTab('home')}>الصفحة الرئيسية</button></div></section><section className="panel"><h2>مراجعة الإجابات</h2>{result.review.map((r,i)=><div className={'review '+(!r.isCorrect?'wrong':'')} key={r.id}><strong>{i+1}. {r.question}</strong><p>إجابتك: {r.selected?r.options[r.selected]:'بدون إجابة'}</p><p>الصحيحة: <b>{r.options[r.correctAnswer]}</b></p><p className="muted">{r.explanation}</p></div>)}</section></>}
+ {tab==='history'&&<section className="panel"><h2>سجل محاولاتك</h2>{!user?<div className="alert">ابدأ اختباراً أولاً ليظهر سجل نتائجك.</div>:history.length?<div className="grid">{history.map((r,i)=><div key={i} className="metric"><b>{r.score}%</b><small>{r.mode==='remedial'?'مراجعة الأخطاء':'أسئلة وزارية'} • {new Date(r.started_at).toLocaleDateString('ar-JO')}</small></div>)}</div>:<p>لم تكمل أي اختبار بعد.</p>}</section>}
  {tab==='privacy'&&<section className="panel" style={{maxWidth:850,margin:'16px auto'}}>
  <span className="section-label">سياسة خصوصية • نسخة تجريبية عامة</span><h2>الخصوصية واستخدام بياناتك</h2>
- <p>«توجيهي 360» منصة تدريب مستقلة ولا تتبع وزارة التربية والتعليم. أسئلة التدريب المنشورة حالياً من تأليف المنصة وليست نسخاً من أسئلة الامتحانات الوزارية.</p>
+ <p>«توجيهي 360» منصة تدريب مستقلة ولا تتبع وزارة التربية والتعليم. لا تُنشر فيها إلا أسئلة امتحانات وزارية يتم التحقق من مصدرها وسنة انعقادها والإذن بإعادة استخدامها. ولا تنسب المنصة أسئلة تدريبية مؤلفة إلى الوزارة.</p>
  <h3>ماذا نخزن؟</h3><p>عند اختيار التدريب السحابي يتم إنشاء معرّف حساب ضيف، ونخزن سجل المحاولات والوقت والإجابات والنتيجة لتصحيح الاختبار واقتراح مراجعة الأخطاء. إذا أنشأت حساباً دائماً، نخزن بريدك الإلكتروني وبيانات المصادقة اللازمة له. لا نطلب الاسم الحقيقي أو الرقم الوطني أو اسم المدرسة.</p>
  <h3>أين تُحفظ المعلومات؟</h3><p>البيانات السحابية محفوظة لدى Supabase، وتُستضاف قاعدة البيانات الحالية خارج الأردن (منطقة أستراليا). وتُستخدم Vercel لعرض الموقع. قد تسجل خدمات الاستضافة معلومات تقنية أساسية لتشغيل الخدمة والحماية.</p>
- <h3>الاختبار المحلي</h3><p>يمكنك استخدام الاختبار التوضيحي دون إنشاء حساب، وتبقى إجاباته ونتائجه في تخزين متصفح الجهاز. حذف بيانات المتصفح يحذف هذا السجل المحلي.</p>
+ <h3>الاختبار المحلي</h3><p>يمكن استخدام التدريب الوزاري بحساب ضيف دون بريد إلكتروني؛ وتُحفظ المحاولات على الخادم حتى تستطيع مراجعة أخطائك. إذا حذفت الحساب فلن تتمكن من استعادة سجله.</p>
  <h3>كيف تتحكم في البيانات؟</h3><p>إذا دخلت بحساب ضيف أو طالب، يمكنك حذف الحساب والنتائج المرتبطة به من الزر أدناه. الحذف نهائي. إذا كنت قاصراً، استشر ولي أمرك قبل استخدام بريد إلكتروني لإنشاء حساب دائم.</p>
- <div className="row"><button className="btn" onClick={()=>{localStorage.removeItem('t360_demo');localStorage.removeItem('t360_active');setMessage('تم تنظيف سجل الاختبار التوضيحي المحفوظ محلياً')}}>حذف سجل الاختبار المحلي</button>{user&&!role&&<button className="btn" style={{color:'#a12a27',borderColor:'#c98382'}} disabled={busy} onClick={()=>void deleteMyAccount()}>حذف حسابي السحابي وجميع نتائجي</button>}</div>
+ <div className="row">{user&&!role&&<button className="btn" style={{color:'#a12a27',borderColor:'#c98382'}} disabled={busy} onClick={()=>void deleteMyAccount()}>حذف حسابي السحابي وجميع نتائجي</button>}</div>
  <p className="small muted">هذه السياسة توضّح الاستخدام البرمجي الحالي. قبل التوسع التجاري يجب تعيين جهة التحكم بالبيانات وبيانات الاتصال الرسمية، واستكمال مراجعة المتطلبات القانونية الأردنية الخاصة بالقاصرين.</p>
  <button className="btn primary" onClick={()=>setTab('home')}>عودة للرئيسية</button>
  </section>}
@@ -156,7 +174,34 @@ function App(){
  {role==='admin'&&<section className="panel"><h2>إدارة الخطط والأجيال</h2><div className="split"><div><label>اسم خطة جديدة<input value={planName} onChange={e=>setPlanName(e.target.value)}/></label><label>السنة الدراسية<input value={academicYear} onChange={e=>setAcademicYear(e.target.value)}/></label><button className="btn" disabled={busy} onClick={()=>void act('create_plan',{name:planName,academicYear,source:ref})}>إضافة خطة مسودة</button></div><div><label>اسم الجيل<input value={label} onChange={e=>setLabel(e.target.value)}/></label><button className="btn" disabled={busy} onClick={()=>void act('add_cohort',{label})}>إضافة جيل</button></div></div><label>مرجع رسمي (HTTPS)<input value={ref} onChange={e=>setRef(e.target.value)}/></label><h3>الخطط</h3>{adminData.plans.map((p:any)=><div key={p.id} className="row-between review"><span>{p.name} — {p.verification_status}</span>{p.verification_status==='draft'&&<button className="btn" disabled={busy} onClick={()=>void act('verify_plan',{planId:p.id,source:ref})}>اعتماد بعد التحقق</button>}</div>)}
  <h3>ربط المواد والخطط</h3><div className="form"><label>الخطة<select value={planId} onChange={e=>setPlanId(e.target.value)}>{adminData.plans.map((p:any)=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label><label>المادة<select value={subId} onChange={e=>setSubId(e.target.value)}>{adminData.subjects.map((x:any)=><option key={x.id} value={x.id}>{x.name_ar}</option>)}</select></label><label>السنة<select value={adminGrade} onChange={e=>setAdminGrade(Number(e.target.value))}><option value={11}>11</option><option value={12}>12</option></select></label><label>الحقل<select value={fieldId} onChange={e=>setFieldId(e.target.value)}><option value="">مشترك</option>{adminData.fields.map((x:any)=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><button className="btn" disabled={busy} onClick={()=>void act('add_plan_subject',{planId,subjectId:subId,grade:adminGrade,fieldId,source:ref})}>إضافة مبحث مسودة</button></div><h3>التحقق من المباحث</h3>{adminData.planSubjects.map((x:any)=><div className="row-between review" key={x.id}><span>{x.subjects?.name_ar} — {x.curriculum_plans?.name} — {x.verification_status}</span>{x.verification_status==='draft'&&<button className="btn" disabled={busy} onClick={()=>void act('verify_subject',{planSubjectId:x.id,source:ref})}>اعتماد المادة</button>}</div>)}
  <h3>ربط الجيل بالمنهاج</h3><div className="form"><label>الجيل<select value={cohortId} onChange={e=>setCohortId(e.target.value)}>{adminData.cohorts.map((c:any)=><option key={c.id} value={c.id}>{c.label}</option>)}</select></label><label>الدورة<input value={examSession} onChange={e=>setExamSession(e.target.value)}/></label><button className="btn" disabled={busy} onClick={()=>void act('add_assignment',{cohortId,planId,grade:adminGrade,examSession,verified:true})}>اعتماد الربط بعد التحقق</button></div></section>}
- <section className="panel"><h2>استيراد أسئلة Excel ومراجعتها</h2><label>اختر المبحث<select value={adminSubjects} onChange={e=>{setAdminSubjects(e.target.value);setQuestionRows([])}}>{adminData.planSubjects.map((s:any)=><option key={s.id} value={s.id}>{s.subjects?.name_ar} • {s.curriculum_plans?.name} • {s.grade_level}</option>)}</select></label><div className="row" style={{marginTop:15}}><button className="btn" onClick={()=>void listQuestions()}>عرض أحدث الأسئلة</button>{['admin','teacher'].includes(role)&&<label className="btn">اختيار ملف XLSX<input style={{display:'none'}} type="file" accept=".xlsx" onChange={e=>{if(e.target.files?.[0])void readExcel(e.target.files[0])}}/></label>}{imports.length>0&&<button className="btn green" disabled={busy} onClick={()=>void importExcel()}>استيراد {imports.length} سؤالاً كمسودة</button>}</div><p className="small muted">أعمدة Excel: question, A, B, C, D, correct, explanation, difficulty, topic, source_type, source_reference. لا توجد إجابات منشورة قبل المراجعة.</p>{questionRows.map(q=><div key={q.id} className="row-between review"><div><b>{q.question}</b><p className="muted">{q.status} • {q.topic}</p></div><div className="row">{q.status==='draft'&&['admin','reviewer'].includes(role)&&<button className="btn" disabled={busy} onClick={()=>void act('set_question_status',{questionId:q.id,status:'review'})}>إرسال للمراجعة</button>}{q.status==='review'&&['admin','reviewer'].includes(role)&&<button className="btn green" disabled={busy} onClick={()=>void act('set_question_status',{questionId:q.id,status:'published'})}>اعتماد النشر</button>}{(q.status==='published'||q.status==='pilot')&&['admin','reviewer'].includes(role)&&<button className="btn" disabled={busy} onClick={()=>void act('set_question_status',{questionId:q.id,status:'archived'})}>أرشفة</button>}</div></div>)}</section></>}
- </main><footer className="footer">توجيهي 360 — منصة مستقلة غير تابعة لوزارة التربية والتعليم • المحتوى التجريبي غير وزاري <button className="btn" style={{marginRight:8,padding:'5px 12px'}} onClick={()=>setTab('privacy')}>الخصوصية</button></footer></div>
+ <section className="panel">
+ <span className="section-label">بنك الأسئلة الوزارية</span><h2>استيراد أسئلة وزارية من Excel</h2>
+ <p className="muted">لا تُقبل الأسئلة التجريبية أو التي لا تملك مرجعاً رسمياً. كل سؤال يُستورد كمسودة، ولا يظهر للطلاب قبل مراجعة النص والإجابة والمصدر وحق استخدامه.</p>
+ <label>اختر المبحث الوزاري<select value={adminSubjects} onChange={e=>{setAdminSubjects(e.target.value);setQuestionRows([]);setImports([])}}>{adminData.planSubjects.map((s:any)=><option key={s.id} value={s.id}>{s.subjects?.name_ar} • {s.curriculum_plans?.name} • {s.grade_level}</option>)}</select></label>
+ <div className="row" style={{marginTop:15}}>
+ <button className="btn" disabled={!adminSubjects} onClick={()=>void listQuestions()}>عرض الأسئلة ومراجعتها</button>
+ {['admin','teacher'].includes(role)&&<label className="btn">استيراد ملف Excel (XLSX)<input style={{display:'none'}} type="file" accept=".xlsx" onChange={e=>{if(e.target.files?.[0])void readExcel(e.target.files[0])}}/></label>}
+ {imports.length>0&&<button className="btn green" disabled={busy||!adminSubjects} onClick={()=>void importExcel()}>استيراد {imports.length} سؤالاً وزارياً كمسودات</button>}
+ </div>
+ <p className="small muted">الأعمدة الإلزامية: question, A, B, C, D, correct, explanation, difficulty, exam_year, exam_session, question_number, source_reference. أعمدة إضافية: topic, rights_note. يجب أن يشير source_reference إلى رابط HTTPS لمصدر الامتحان الرسمي، وليس مصدراً غير موثوق.</p>
+ <p className="small muted">تُحدد الحقوق في rights_note مثل مستند التصريح ورقم الإذن والجهة المانحة. وجود سؤال منشور على الإنترنت لا يعني تلقائياً السماح بإعادة نشره.</p>
+ {imports.length>0&&<div className="alert">جاهز لاستيراد {imports.length} سؤال. المعاينة: {imports.slice(0,3).map((q:any)=>q.exam_year+' / '+q.exam_session+' / سؤال '+q.question_number).join(' ؛ ')}</div>}
+ <h3>مراجعة الأسئلة المستوردة</h3>
+ {questionRows.length===0&&<p className="muted">اختر المبحث واضغط «عرض الأسئلة ومراجعتها». لا يوجد محتوى تجريبي في بنك الأسئلة.</p>}
+ {questionRows.map((q:any)=><div key={q.id} className="review">
+ <div className="row-between"><strong>{q.question}</strong><span className="pill">{q.status==='draft'?'مسودة':q.status==='review'?'بانتظار اعتماد النشر':q.status==='published'?'منشور':'مؤرشف'}</span></div>
+ <p className="small muted">{q.exam_year} • {q.exam_session} • رقم السؤال {q.question_number} • {q.topic}</p>
+ <div className="grid">{['A','B','C','D'].map(k=><div key={k} className="card" style={{minHeight:0,padding:9,borderColor:q.correct===k?'#138a71':undefined}}>
+ <b>{chars[k]}</b> — {q.options?.[k]||'—'} {q.correct===k?'✓ الإجابة المعتمدة في الملف':''}</div>)}</div>
+ <p><b>تفسير الحل:</b> {q.explanation}</p>
+ <p className="small"><b>المصدر:</b> {q.source_reference?.startsWith('https://')?<a href={q.source_reference} target="_blank" rel="noopener noreferrer">فتح وثيقة المصدر ↗</a>:'مصدر غير مكتمل'}</p>
+ <p className="small"><b>حق إعادة الاستخدام:</b> {q.rights_note||'لم يوثّق بعد — لا يمكن نشر السؤال'}</p>
+ <div className="row">
+ {q.status==='draft'&&['admin','reviewer'].includes(role)&&<button className="btn" disabled={busy} onClick={()=>void act('set_question_status',{questionId:q.id,status:'review'})}>تمت المراجعة الأولية</button>}
+ {q.status==='review'&&['admin','reviewer'].includes(role)&&<button className="btn green" disabled={busy||!q.rights_note||q.rights_note.length<12} onClick={()=>void act('set_question_status',{questionId:q.id,status:'published'})}>تأكيد المصدر والحقوق ونشر السؤال</button>}
+ {q.status==='published'&&['admin','reviewer'].includes(role)&&<button className="btn" disabled={busy} onClick={()=>void act('set_question_status',{questionId:q.id,status:'archived'})}>إيقاف نشر السؤال</button>}
+ </div></div>)}
+ </section></>}
+ </main><footer className="footer">توجيهي 360 — منصة مستقلة • فقط الأسئلة الوزارية التي تم التحقق منها <button className="btn" style={{marginRight:8,padding:'5px 12px'}} onClick={()=>setTab('privacy')}>الخصوصية</button></footer></div>
 }
 createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);
