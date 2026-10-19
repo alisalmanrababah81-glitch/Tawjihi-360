@@ -4,6 +4,7 @@ import {createRoot} from 'react-dom/client';
 import {createClient, type User} from '@supabase/supabase-js';
 import { readSheet } from 'read-excel-file/browser';
 import './styles.css';
+import PathwayExplorer,{type Pathway} from './PathwayExplorer';
 
 const URL=import.meta.env.VITE_SUPABASE_URL;
 const KEY=import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -11,7 +12,7 @@ const db=URL&&KEY?createClient(URL,KEY,{auth:{persistSession:true,autoRefreshTok
 type Subject={id:string;grade_level:number;field_id:string|null;curriculum_plan_id:string;subjects:{name_ar:string;code:string}};
 type Q={id:string;question:string;topic:string;difficulty:number;options:Record<string,string>};
 type Session={attemptId:string;questions:Q[];mode:string};
-type Review={id:string;question:string;topic:string;options:Record<string,string>;selected:string|null;correctAnswer:string;isCorrect:boolean;explanation:string};
+type Review={id:string;question:string;topic:string;options:Record<string,string>;selected:string|null;correctAnswer:string;isCorrect:boolean;explanation:string;sourceReference?:string;examYear?:number;examSession?:string;questionNumber?:string};
 type Result={score:number;correctCount:number;total:number;review:Review[]};
 const chars:Record<string,string>={A:'أ',B:'ب',C:'ج',D:'د'};
 const why=(e:unknown)=>e instanceof Error?e.message:String(e);
@@ -24,7 +25,7 @@ async function functionCall<T=any>(name:'quiz'|'admin'|'privacy',body:Record<str
 }
 function App(){
  const [user,setUser]=useState<User|null>(null),[role,setRole]=useState(''),[tab,setTab]=useState('home');
- const [catalog,setCatalog]=useState<Subject[]>([]),[inventory,setInventory]=useState<Record<string,number>>({}),[cohorts,setCohorts]=useState<{id:string;label:string}[]>([]),[mappings,setMappings]=useState<{cohort_id:string;grade_level:number;curriculum_plan_id:string}[]>([]),[fields,setFields]=useState<{id:string;name:string}[]>([]);
+ const [pathways,setPathways]=useState<Pathway[]>([]),[catalog,setCatalog]=useState<Subject[]>([]),[inventory,setInventory]=useState<Record<string,number>>({}),[cohorts,setCohorts]=useState<{id:string;label:string}[]>([]),[mappings,setMappings]=useState<{cohort_id:string;grade_level:number;curriculum_plan_id:string}[]>([]),[fields,setFields]=useState<{id:string;name:string}[]>([]);
  const [cohort,setCohort]=useState(''),[grade,setGrade]=useState(11),[field,setField]=useState(''),[subject,setSubject]=useState('');
  const [session,setSession]=useState<Session|null>(null),[answers,setAnswers]=useState<Record<string,string>>({}),[current,setCurrent]=useState(0),[result,setResult]=useState<Result|null>(null),[history,setHistory]=useState<any[]>([]),[resultSubject,setResultSubject]=useState('');
  const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[signup,setSignup]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
@@ -38,16 +39,17 @@ function App(){
  const chosen=visible.find(s=>s.id===subject)||visible[0];
  async function reload(){
   if(!db)return;
-  const [c,m,s,f,i]=await Promise.all([
+  const [c,m,s,f,i,p]=await Promise.all([
    db.from('cohorts').select('id,label').eq('active',true),
    db.from('cohort_curriculum_assignments').select('cohort_id,grade_level,curriculum_plan_id').eq('verified',true),
    db.from('plan_subjects').select('id,grade_level,field_id,curriculum_plan_id,subjects!inner(name_ar,code)').eq('verification_status','verified').eq('is_ministerial_exam',true),
    db.from('fields').select('id,name'),
-   db.from('question_inventory').select('plan_subject_id,published_count')
+   db.from('question_inventory').select('plan_subject_id,published_count'),
+   db.from('tawjihi_pathways').select('id,cohort_label,academic_year,grade_level,field_code,field_name,fixed_subject_codes,optional_subject_codes,status,source_url,secondary_reference_url,editorial_note').order('grade_level')
   ]);
-  const failed=[c,m,s,f,i].find(q=>q.error);if(failed?.error)throw failed.error;
-  setCohorts((c.data||[]) as any);setMappings((m.data||[]) as any);setCatalog((s.data||[]) as any);setFields(f.data||[]);setInventory(Object.fromEntries((i.data||[]).map((v:any)=>[v.plan_subject_id,Number(v.published_count)||0])));
-  setCohort(p=>p||localStorage.getItem('t360_cohort')||(c.data||[])[0]?.id||'');
+  const failed=[c,m,s,f,i,p].find(q=>q.error);if(failed?.error)throw failed.error;
+  setCohorts((c.data||[]) as any);setMappings((m.data||[]) as any);setCatalog((s.data||[]) as any);setFields(f.data||[]);setPathways((p.data||[]) as Pathway[]);setInventory(Object.fromEntries((i.data||[]).map((v:any)=>[v.plan_subject_id,Number(v.published_count)||0])));
+  setCohort(p=>p||localStorage.getItem('t360_cohort')||(c.data||[]).find(x=>x.label==='جيل 2010')?.id||(c.data||[])[0]?.id||'');
   setField(p=>p||(f.data||[])[0]?.id||'');
  }
  async function refresh(){
@@ -123,41 +125,36 @@ function App(){
 
  async function importExcel(){setBusy(true);setError('');try{let imported=0;for(let i=0;i<imports.length;i+=50){const r=await functionCall<{imported:number}>('admin',{action:'import_questions',planSubjectId:adminSubjects,questions:imports.slice(i,i+50)});imported+=r.imported}setImports([]);setMessage('تم استيراد '+imported+' سؤال وزاري كمسودات بانتظار مراجعة المصادر والإجابات');await listQuestions()}catch(e){setError(why(e))}finally{setBusy(false)}}
  if(!db)return <main className="wrap"><h1>توجيهي 360</h1><div className="alert error">لم يتم إعداد VITE_SUPABASE_URL و VITE_SUPABASE_ANON_KEY</div></main>;
- return <div dir="rtl"><div className="ribbon">توجيهي 360 • منصة تدريب مستقلة • الأسئلة الوزارية تتطلب توثيق المصدر واعتماد المعلم</div>
+ return <div dir="rtl"><div className="ribbon">توجيهي 360 • خريطة مسارك الوزاري • أسئلة موثقة فقط • الأردن 2026/2027</div>
  <header className="header"><div className="headerin"><div className="brand">توجيهي <b>360</b><small>مش بس تعرف علامتك، تعرف كيف ترفعها.</small></div><nav className="nav"><button className={tab==='home'?'active':''} onClick={()=>setTab('home')}>الرئيسية</button><button onClick={()=>void loadHistory()}>نتائجي</button>{role&&<button onClick={()=>void loadAdmin()}>لوحة الإدارة</button>}{user?<button onClick={()=>void logout()}>{user.email?'خروج':'ضيف • خروج'}</button>:<button onClick={()=>setTab('login')}>تسجيل الدخول</button>}<button onClick={()=>setTab('privacy')}>الخصوصية</button></nav></div></header>
  <main className="wrap">{error&&<div role="alert" className="alert error">{error}</div>}{message&&<div className="alert success">{message}<button className="btn" style={{float:'left'}} onClick={()=>setMessage('')}>×</button></div>}
  
- {tab==='home'&&<>
- <div className="hero">
-  <span className="pill">التدريب على أسئلة امتحانات وزارية موثقة</span>
-  <h1>توجيهي 360<br/> مش بس تعرف علامتك، تعرف كيف ترفعها.</h1>
-  <p>تدرّب على الأسئلة الوزارية بعد توثيق المصدر ومراجعتها ونشرها. لا تتضمن المنصة أسئلة تجريبية أو مولّدة أو منسوبة خطأً إلى الوزارة.</p>
-  <button className="btn" onClick={()=>document.getElementById('choose')?.scrollIntoView({behavior:'smooth'})}>اختر مبحثك ←</button>
+ {tab==='home'&&<PathwayExplorer
+  pathways={pathways}
+  cohorts={cohorts} cohortId={cohort} changeCohort={setCohort}
+  grade={grade} changeGrade={setGrade}
+  fields={fields} fieldId={field} changeField={setField}
+  available={visible} inventory={inventory} busy={busy}
+  consent={consent}
+  changeConsent={value=>{setConsent(value);setConsentError('');if(value)localStorage.setItem('t360_cloud_agreement','yes');else localStorage.removeItem('t360_cloud_agreement')}}
+  consentError={consentError}
+  openPrivacy={()=>setTab('privacy')}
+  startQuiz={id=>{void begin('quick',id)}}
+/>}
+ {tab==='quiz'&&session&&<section className="panel"><div className="row-between"><span className="section-label">{'أسئلة امتحانات وزارية — '+(session.mode==='remedial'?'مراجعة الأخطاء':'اختبار سريع')}</span><strong>{current+1} / {session.questions.length}</strong></div><div className="progress"><div style={{width:(100*(current+1)/session.questions.length)+'%'}}/></div><h2 className="question">{session.questions[current].question}</h2>{Object.entries(session.questions[current].options).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=><button key={k} className={'choice '+(answers[session.questions[current].id]===k?'selected':'')} onClick={()=>setAnswers(p=>({...p,[session.questions[current].id]:k}))}><strong>{chars[k]||k}</strong>{v}</button>)}<div className="row-between" style={{marginTop:20}}><button className="btn" disabled={current===0} onClick={()=>setCurrent(v=>v-1)}>السابق</button>{current+1<session.questions.length?<button className="btn primary" onClick={()=>setCurrent(v=>v+1)}>التالي ←</button>:<button disabled={busy} className="btn green" onClick={()=>void submit()}>تسليم وتصحيح الاختبار</button>}</div></section>}
+ {tab==='result'&&result&&<><section className="panel"><span className="section-label">نتيجتك — ماذا تعلمت؟</span><h2>العلامة ليست النهاية؛ بل بداية خطة التحسين</h2><div className="grid"><div className="metric"><b>{result.score}%</b><small>علامتك</small></div><div className="metric"><b>{result.correctCount}</b><small>إجابات صحيحة</small></div><div className="metric"><b>{result.total-result.correctCount}</b><small>تحتاج مراجعة</small></div></div><div className="error-topics">
+ <span className="section-label">خارطة مراجعة الأخطاء</span>
+ <h3>الموضوعات التي تحتاج أن تعود إليها</h3>
+ {result.review.some(r=>!r.isCorrect)?
+ <div className="row">{Array.from(new Set(result.review.filter(r=>!r.isCorrect).map(r=>r.topic||'غير مصنف'))).map(topic=><span key={topic} className="error-topic">{topic}</span>)}</div>:
+ <p className="muted">أحسنت! لم تسجّل إجابات خاطئة في هذه المحاولة.</p>}
  </div>
- <section className="panel" id="choose"><h2>اختر الجيل والسنة والمبحث الوزاري</h2>
- <div className="alert">تبدأ الاختبارات عندما يُنشر للمبحث 5 أسئلة وزارية موثقة على الأقل. حتى ذلك الحين ستظهر المواد بعبارة «بانتظار إضافة الأسئلة الوزارية».</div>
- <div className="form"><label>الجيل<select value={cohort} onChange={e=>setCohort(e.target.value)}>{cohorts.map(x=><option key={x.id} value={x.id}>{x.label}</option>)}</select></label>
- <label>السنة<select value={grade} onChange={e=>setGrade(Number(e.target.value))}><option value={11}>الأولى — الحادي عشر</option><option value={12}>الثانية — الثاني عشر</option></select></label>
- {grade===12&&<label>الحقل<select value={field} onChange={e=>setField(e.target.value)}>{fields.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}</div>
- <div className="row" style={{justifyContent:'flex-start',margin:'17px 0'}}>
- <label className="row"><input type="checkbox" style={{width:18,height:18}} checked={consent}
- onChange={e=>{setConsent(e.target.checked);setConsentError('');if(e.target.checked)localStorage.setItem('t360_cloud_agreement','yes');else localStorage.removeItem('t360_cloud_agreement')}}/>
- أوافق على حفظ محاولاتي ونتائجي للتصحيح وتخصيص التدريب. <button className="btn" style={{padding:'5px 8px'}} onClick={()=>setTab('privacy')}>الخصوصية</button></label>
- </div>{consentError&&<div className="alert error" role="alert">{consentError}</div>}
- <div className="grid">{visible.map(s=><div key={s.id} className="card">
- <span className="section-label">مبحث وزاري</span><h3>{s.subjects.name_ar}</h3>
- <p>{(inventory[s.id]||0)>0?('أسئلة وزارية منشورة: '+inventory[s.id]):'بانتظار إضافة الأسئلة الوزارية'}</p>
- <button className="btn primary" style={{marginTop:14}} disabled={busy||(inventory[s.id]||0)<5}
- onClick={()=>void begin('quick',s.id)}>{(inventory[s.id]||0)<5?'غير متاح بعد':'ابدأ اختباراً وزارياً ←'}</button>
- </div>)}</div>
- {!visible.length&&<div className="alert">لا توجد مباحث وزارية مرتبطة بهذا الجيل والسنة حتى الآن.</div>}
- </section>
- <div className="grid"><div className="panel"><h2>تدريب على الأخطاء</h2><p className="muted">بعد حل الأسئلة الوزارية، يقدّم لك النظام تمارين إضافية من البنك الوزاري المنشور مع إعطاء الأولوية لأخطائك.</p></div>
- <div className="panel"><h2>تصحيح وتفسير</h2><p className="muted">تُصحّح الإجابات على الخادم، ثم تظهر النتيجة والتفسير والمصدر الوزاري للأسئلة المتاحة.</p></div></div>
- </>}
-
-{tab==='quiz'&&session&&<section className="panel"><div className="row-between"><span className="section-label">{'أسئلة امتحانات وزارية — '+(session.mode==='remedial'?'مراجعة الأخطاء':'اختبار سريع')}</span><strong>{current+1} / {session.questions.length}</strong></div><div className="progress"><div style={{width:(100*(current+1)/session.questions.length)+'%'}}/></div><h2 className="question">{session.questions[current].question}</h2>{Object.entries(session.questions[current].options).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=><button key={k} className={'choice '+(answers[session.questions[current].id]===k?'selected':'')} onClick={()=>setAnswers(p=>({...p,[session.questions[current].id]:k}))}><strong>{chars[k]||k}</strong>{v}</button>)}<div className="row-between" style={{marginTop:20}}><button className="btn" disabled={current===0} onClick={()=>setCurrent(v=>v-1)}>السابق</button>{current+1<session.questions.length?<button className="btn primary" onClick={()=>setCurrent(v=>v+1)}>التالي ←</button>:<button disabled={busy} className="btn green" onClick={()=>void submit()}>تسليم وتصحيح الاختبار</button>}</div></section>}
- {tab==='result'&&result&&<><section className="panel"><span className="section-label">نتيجتك — ماذا تعلمت؟</span><h2>العلامة ليست النهاية؛ بل بداية خطة التحسين</h2><div className="grid"><div className="metric"><b>{result.score}%</b><small>علامتك</small></div><div className="metric"><b>{result.correctCount}</b><small>إجابات صحيحة</small></div><div className="metric"><b>{result.total-result.correctCount}</b><small>تحتاج مراجعة</small></div></div><div className="row" style={{marginTop:18}}><button disabled={busy} className="btn primary" onClick={()=>void begin('remedial',resultSubject)}>اختبرني في أخطائي</button><button className="btn" onClick={()=>setTab('home')}>الصفحة الرئيسية</button></div></section><section className="panel"><h2>مراجعة الإجابات</h2>{result.review.map((r,i)=><div className={'review '+(!r.isCorrect?'wrong':'')} key={r.id}><strong>{i+1}. {r.question}</strong><p>إجابتك: {r.selected?r.options[r.selected]:'بدون إجابة'}</p><p>الصحيحة: <b>{r.options[r.correctAnswer]}</b></p><p className="muted">{r.explanation}</p></div>)}</section></>}
+ <div className="row" style={{marginTop:18}}><button disabled={busy} className="btn primary" onClick={()=>void begin('remedial',resultSubject)}>اختبرني في أخطائي</button><button className="btn" onClick={()=>setTab('home')}>الصفحة الرئيسية</button></div></section><section className="panel"><h2>مراجعة الإجابات</h2>{result.review.map((r,i)=><div className={'review '+(!r.isCorrect?'wrong':'')} key={r.id}><strong>{i+1}. {r.question}</strong><p>إجابتك: {r.selected?r.options[r.selected]:'بدون إجابة'}</p><p>الصحيحة: <b>{r.options[r.correctAnswer]}</b></p><p className="muted">{r.explanation}</p>
+{r.sourceReference&&<div className="review-provenance">
+ <strong>مصدر السؤال الوزاري</strong>
+ <span>امتحان {r.examYear||'—'} • {r.examSession||'—'} • السؤال {r.questionNumber||'—'}</span>
+ <a href={r.sourceReference} target="_blank" rel="noopener noreferrer">فتح المصدر الأصلي ↗</a>
+</div>}</div>)}</section></>}
  {tab==='history'&&<section className="panel"><h2>سجل محاولاتك</h2>{!user?<div className="alert">ابدأ اختباراً أولاً ليظهر سجل نتائجك.</div>:history.length?<div className="grid">{history.map((r,i)=><div key={i} className="metric"><b>{r.score}%</b><small>{r.mode==='remedial'?'مراجعة الأخطاء':'أسئلة وزارية'} • {new Date(r.started_at).toLocaleDateString('ar-JO')}</small></div>)}</div>:<p>لم تكمل أي اختبار بعد.</p>}</section>}
  {tab==='privacy'&&<section className="panel" style={{maxWidth:850,margin:'16px auto'}}>
  <span className="section-label">سياسة خصوصية • نسخة تجريبية عامة</span><h2>الخصوصية واستخدام بياناتك</h2>
