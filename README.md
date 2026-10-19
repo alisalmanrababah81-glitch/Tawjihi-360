@@ -49,3 +49,14 @@ Never insert secret Supabase service keys into `VITE_` variables, GitHub or the 
 - New branch was created specifically to repair Vercel build problems from incomplete root archive; it does not restore V1.0 source files byte-for-byte.
 - More dependency vulnerabilities were reported by npm audit and must be reviewed before production.
 - Automated authenticated quiz/admin end-to-end tests have **not** been run; do not claim launch-ready status.
+
+
+## Math pilot — 19 October 2026
+- **32 original mathematics MCQs** were placed in `private.questions` with `editorial_status='pilot'`. These are not government exam questions, not designated as past papers, and not validated lesson-by-lesson against the national textbook.
+- Five older practice questions remain `draft`. No questions were marked `published` for the official exam bank.
+- `public.question_inventory` exposes `pilot_count` and `published_count` under RLS; public clients cannot read answer keys from `private.question_options`.
+- `public.start_pilot_quiz(user_id,subject_id,number)` accepts 5 or 10 questions; `quiz` Edge Function v2 exposes action `pilot` to authenticated and anonymous-authenticated users.
+- Pilot answers are graded on the server after submission using `grade_quiz_attempt`. Wrongly answered prior pilot questions receive first priority on the next session.
+- SQL transactional test passed for 5-question start, resume, full-score grading, 80%-score grading, duplicate-submit rejection and wrong-question reprioritization. Test transaction was rolled back and did not change users' results.
+- Vercel preview build succeeded; Vercel-protected preview may require a temporary share link.
+- **Outstanding:** real browser end-to-end test with an anonymous student session, curriculum lesson alignment, content editorial review, dependency vulnerability remediation, GDPR/Jordanian minor data handling, production rollout approval.
