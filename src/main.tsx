@@ -12,7 +12,7 @@ const db=URL&&KEY?createClient(URL,KEY,{auth:{persistSession:true,autoRefreshTok
 type Subject={id:string;grade_level:number;field_id:string|null;curriculum_plan_id:string;subjects:{name_ar:string;code:string}};
 type Q={id:string;question:string;topic:string;difficulty:number;options:Record<string,string>};
 type Session={attemptId:string;questions:Q[];mode:string};
-type Review={id:string;question:string;topic:string;options:Record<string,string>;selected:string|null;correctAnswer:string;isCorrect:boolean;explanation:string};
+type Review={id:string;question:string;topic:string;options:Record<string,string>;selected:string|null;correctAnswer:string;isCorrect:boolean;explanation:string;sourceReference?:string;examYear?:number;examSession?:string;questionNumber?:string};
 type Result={score:number;correctCount:number;total:number;review:Review[]};
 const chars:Record<string,string>={A:'أ',B:'ب',C:'ج',D:'د'};
 const why=(e:unknown)=>e instanceof Error?e.message:String(e);
