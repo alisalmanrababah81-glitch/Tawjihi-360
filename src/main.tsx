@@ -49,7 +49,7 @@ function App(){
   ]);
   const failed=[c,m,s,f,i,p].find(q=>q.error);if(failed?.error)throw failed.error;
   setCohorts((c.data||[]) as any);setMappings((m.data||[]) as any);setCatalog((s.data||[]) as any);setFields(f.data||[]);setPathways((p.data||[]) as Pathway[]);setInventory(Object.fromEntries((i.data||[]).map((v:any)=>[v.plan_subject_id,Number(v.published_count)||0])));
-  setCohort(p=>p||localStorage.getItem('t360_cohort')||(c.data||[])[0]?.id||'');
+  setCohort(p=>p||localStorage.getItem('t360_cohort')||(c.data||[]).find(x=>x.label==='جيل 2010')?.id||(c.data||[])[0]?.id||'');
   setField(p=>p||(f.data||[])[0]?.id||'');
  }
  async function refresh(){
